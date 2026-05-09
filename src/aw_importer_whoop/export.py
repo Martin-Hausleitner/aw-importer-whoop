@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import re
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -143,6 +144,11 @@ def cycle_records(rows: Iterable[dict[str, str]]) -> Iterable[dict[str, Any]]:
         yield {k: v for k, v in record.items() if v is not None}
 
 
+def _slug(text: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return slug[:64] or "journal"
+
+
 def journal_records(rows: Iterable[dict[str, str]]) -> Iterable[dict[str, Any]]:
     for row in rows:
         start = _parse_dt(row.get("Cycle start time"))
@@ -154,7 +160,8 @@ def journal_records(rows: Iterable[dict[str, str]]) -> Iterable[dict[str, Any]]:
             "id": _id("journal", start, question),
             "start": start,
             "end": end,
-            "question_text": question,
+            "question_hash": hashlib.sha256(question.encode()).hexdigest()[:16],
+            "question_slug": _slug(question),
             "answered_yes": _bool(row.get("Answered yes")),
             # Deliberately do not import free-text notes by default.
             "has_notes": bool(row.get("Notes")),

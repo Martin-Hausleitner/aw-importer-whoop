@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from aw_importer_whoop.activitywatch import record_times, record_uuid, stable_hash
-from aw_importer_whoop.export import sleep_records, workout_records
+from aw_importer_whoop.export import journal_records, sleep_records, workout_records
 from aw_importer_whoop.state import ImportState, parse_dt
 from aw_importer_whoop.sync import SyncLoop
 
@@ -57,3 +57,14 @@ def test_export_workout_record_maps_activity() -> None:
     rec = next(iter(workout_records(rows)))
     assert rec["activity_name"] == "Running"
     assert rec["strain"] == 12.3
+
+
+def test_journal_records_do_not_include_private_text_or_notes() -> None:
+    rows = [{"Cycle start time": "2026-05-01T00:00:00Z", "Cycle end time": "2026-05-01T08:00:00Z", "Question text": "Did you drink alcohol?", "Answered yes": "yes", "Notes": "private note"}]
+    rec = next(iter(journal_records(rows)))
+    assert "question_text" not in rec
+    assert "Notes" not in rec
+    assert "notes" not in rec
+    assert rec["question_hash"]
+    assert rec["question_slug"] == "did-you-drink-alcohol"
+    assert rec["has_notes"] is True

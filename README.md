@@ -249,3 +249,9 @@ ruff check .
 ## License
 
 MIT
+
+### WHOOP export journal privacy
+
+`journal_entries.csv` is imported into `aw-importer-whoop-journal`, but free-text notes are never imported. Journal question text is also not stored directly by default; the importer stores a short `question_hash`/`question_slug`, `answered_yes`, and `has_notes` only.
+
+This keeps habit/journal backfills useful for trend analysis without copying private journal text into ActivityWatch.
