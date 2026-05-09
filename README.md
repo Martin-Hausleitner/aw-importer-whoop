@@ -41,11 +41,11 @@ curl http://127.0.0.1:5600/api/0/info
 ## Install for local development
 
 ```bash
-git clone https://github.com/<your-user>/aw-importer-whoop.git
+git clone https://github.com/Martin-Hausleitner/aw-importer-whoop.git
 cd aw-importer-whoop
 python3 -m venv .venv
 . .venv/bin/activate
-pip install -e '.[dev]'
+pip install -e . pytest ruff
 pytest -q
 ```
 
@@ -229,4 +229,4 @@ ruff check .
 
 ## License
 
-Choose and add a license before wider public release.
+MIT
