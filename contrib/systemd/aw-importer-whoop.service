@@ -1,0 +1,15 @@
+[Unit]
+Description=WHOOP to ActivityWatch importer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=WHOOP_CLIENT_ID=replace-me
+Environment=WHOOP_CLIENT_SECRET=replace-me
+ExecStart=/usr/local/bin/aw-importer-whoop sync
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=default.target

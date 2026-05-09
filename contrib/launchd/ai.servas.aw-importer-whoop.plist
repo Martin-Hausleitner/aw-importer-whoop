@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>ai.servas.aw-importer-whoop</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/aw-importer-whoop</string>
+    <string>sync</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>WHOOP_CLIENT_ID</key>
+    <string>replace-me</string>
+    <key>WHOOP_CLIENT_SECRET</key>
+    <string>replace-me</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/aw-importer-whoop.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/aw-importer-whoop.err.log</string>
+</dict>
+</plist>
