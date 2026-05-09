@@ -130,6 +130,25 @@ aw-importer-whoop sync \
 
 Default interval is 900 seconds / 15 minutes.
 
+
+## Backfill from a WHOOP export ZIP
+
+WHOOP email exports can be imported locally without committing raw health data.
+
+```bash
+aw-importer-whoop import-export ~/ActivityWatchImports/whoop-exports/my_whoop_data_YYYY_MM_DD.zip --dry-run
+aw-importer-whoop import-export ~/ActivityWatchImports/whoop-exports/my_whoop_data_YYYY_MM_DD.zip
+```
+
+The importer maps:
+
+- `sleeps.csv` → `aw-importer-whoop-sleep`
+- `workouts.csv` → `aw-importer-whoop-workout`
+- `physiological_cycles.csv` → `aw-importer-whoop-cycle`
+- `journal_entries.csv` → `aw-importer-whoop-journal` with free-text notes excluded by default
+
+Keep export ZIPs and extracted CSVs local. They are ignored/private data and must not be committed.
+
 ## Verify in ActivityWatch
 
 List WHOOP buckets:

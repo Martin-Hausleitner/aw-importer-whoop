@@ -6,6 +6,7 @@ import os
 import secrets
 import urllib.parse
 import webbrowser
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
@@ -108,6 +109,21 @@ def login(client_id: str, client_secret: str, redirect_uri: str, open_browser: b
     tmp.replace(path)
     os.chmod(path, 0o600)
     click.echo(f"Saved WHOOP OAuth tokens to {path}")
+
+
+@main.command("import-export")
+@click.argument("path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--type", "data_types", multiple=True, type=click.Choice(["sleep", "workout", "cycle", "journal"]), help="Limit import to one or more export data types.")
+@click.option("--dry-run", is_flag=True, help="Parse the export without writing ActivityWatch events or state.")
+def import_export_command(path: Path, data_types: tuple[str, ...], dry_run: bool) -> None:
+    """Backfill local ActivityWatch from a WHOOP data export ZIP."""
+    from .export import EXPORT_TYPES, import_export
+
+    stats = import_export(path, data_types or EXPORT_TYPES, dry_run=dry_run)
+    click.echo(
+        f"parsed={stats.parsed} inserted={stats.inserted} updated={stats.updated} "
+        f"skipped={stats.skipped} dry_run={dry_run}"
+    )
 
 
 class _CallbackHandler(BaseHTTPRequestHandler):
