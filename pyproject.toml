@@ -17,8 +17,6 @@ python-dateutil = "^2.9.0.post0"
 pytest = "^8.2.0"
 ruff = "^0.5.0"
 
-[project.optional-dependencies]
-dev = ["pytest>=8.2.0", "ruff>=0.5.0"]
 
 [tool.poetry.scripts]
 aw-importer-whoop = "aw_importer_whoop.cli:main"
