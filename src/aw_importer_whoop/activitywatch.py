@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import socket
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
@@ -40,11 +40,21 @@ def record_times(record: dict[str, Any]) -> tuple[str, float]:
 
 
 def normalized_record(data_type: str, record: dict[str, Any], include_raw: bool = False) -> dict[str, Any]:
+    # Keep the online WHOOP API schema compact, but preserve the richer CSV export
+    # fields we already normalized in export.py. Journal note text is intentionally
+    # not produced by export.py, so this remains safe for ActivityWatch browsing.
     keys = {
         "id", "sleep_id", "workout_id", "cycle_id", "recovery_id",
         "start", "end", "start_time", "end_time", "created_at", "updated_at",
         "score_state", "score", "strain", "average_heart_rate", "max_heart_rate",
         "kilojoule", "sport_id", "timezone_offset", "nap",
+        "source", "timezone", "cycle_start", "cycle_end",
+        "sleep_performance_percent", "respiratory_rate_rpm", "asleep_duration_min",
+        "in_bed_duration_min", "light_sleep_duration_min", "deep_sws_duration_min",
+        "rem_duration_min", "activity_name", "duration_min",
+        "recovery_score_percent", "resting_heart_rate_bpm",
+        "heart_rate_variability_ms", "skin_temp_celsius", "blood_oxygen_percent",
+        "energy_burned_cal", "question", "question_slug", "answered_yes", "has_notes",
     }
     data = {k: record[k] for k in keys if k in record}
     if include_raw:
@@ -90,11 +100,45 @@ class ActivityWatchClient:
             },
         }
         with httpx.Client(timeout=self.timeout) as client:
+            stale_ids = [] if old_event_id is None else [old_event_id]
+            # If state was lost/clobbered by another sync process, still keep ZIP imports
+            # idempotent by finding existing events with the same WHOOP/export id.
+            stale_ids.extend(self._find_matching_event_ids(client, bucket_id, rid, timestamp, duration))
+            stale_ids = list(dict.fromkeys(stale_ids))
+
             inserted = client.post(f"{self.base_url}/buckets/{bucket_id}/events", json=event)
             inserted.raise_for_status()
             new_id = inserted.json()
-            if old_event_id is not None:
-                delete = client.delete(f"{self.base_url}/buckets/{bucket_id}/events/{old_event_id}")
+            for event_id in stale_ids:
+                if new_id is not None and int(event_id) == int(new_id):
+                    continue
+                delete = client.delete(f"{self.base_url}/buckets/{bucket_id}/events/{event_id}")
                 if delete.status_code not in (200, 404):
                     delete.raise_for_status()
             return int(new_id) if new_id is not None else -1
+
+    def _find_matching_event_ids(
+        self,
+        client: httpx.Client,
+        bucket_id: str,
+        whoop_id: str,
+        timestamp: str,
+        duration: float,
+    ) -> list[int]:
+        try:
+            start_dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00")) - timedelta(seconds=1)
+            end_dt = start_dt + timedelta(seconds=max(duration, 1) + 2)
+            r = client.get(
+                f"{self.base_url}/buckets/{bucket_id}/events",
+                params={"start": start_dt.isoformat(), "end": end_dt.isoformat()},
+            )
+            if r.status_code != 200:
+                return []
+            ids: list[int] = []
+            for event in r.json():
+                data = event.get("data") or {}
+                if str(data.get("whoop_id")) == str(whoop_id) and event.get("id") is not None:
+                    ids.append(int(event["id"]))
+            return ids
+        except Exception:
+            return []

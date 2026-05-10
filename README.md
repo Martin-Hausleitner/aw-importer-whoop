@@ -1,257 +1,125 @@
 # aw-importer-whoop
 
-![WHOOP to ActivityWatch flow](docs/assets/whoop-activitywatch-flow.svg)
+Import your own WHOOP data into local ActivityWatch.
 
-Local **WHOOP → ActivityWatch** importer. It connects your own WHOOP account through OAuth, calls the official WHOOP Developer API, and writes normalized events into your local ActivityWatch server.
+## What it supports
 
-- ✅ Private by default: tokens stay on your machine.
-- ✅ Works with ActivityWatch at `http://127.0.0.1:5600/api/0`.
-- ✅ Imports sleep, workouts, cycles, and recovery.
-- ✅ Refreshes expiring access tokens automatically.
-- ✅ Idempotent sync: changed WHOOP records replace their older ActivityWatch event.
-- ✅ Useful for humans and AI agents that need local health/activity context.
-
-## What gets imported
-
-- `aw-importer-whoop-sleep` → `whoop.sleep`
-- `aw-importer-whoop-workout` → `whoop.workout`
-- `aw-importer-whoop-cycle` → `whoop.cycle`
-- `aw-importer-whoop-recovery` → `whoop.recovery`
-
-Each ActivityWatch event contains:
-
-- WHOOP record id
-- data type
-- normalized public metrics such as timestamps, score state, strain, heart-rate fields when WHOOP provides them
-- no raw payload by default
+- OAuth sync from the WHOOP API into ActivityWatch:
+  - sleep
+  - workout
+  - cycle
+  - recovery
+- Backfill from WHOOP email export ZIPs:
+  - `sleeps.csv`
+  - `workouts.csv`
+  - `physiological_cycles.csv`
+  - `journal_entries.csv`
+- Idempotent imports using stable hashes in the local importer state.
+- Local-only ActivityWatch buckets prefixed with `aw-importer-whoop-*`.
+- Privacy-conscious journal import: journal note text is not written to ActivityWatch.
 
 ## Requirements
 
 - Python 3.11+
-- ActivityWatch running locally
-- A WHOOP Developer app
-- Your WHOOP account credentials for the browser OAuth consent flow
+- Local ActivityWatch server, default: `http://localhost:5600`
+- For API sync: WHOOP OAuth client credentials.
 
-Check ActivityWatch:
-
-```bash
-curl http://127.0.0.1:5600/api/0/info
-```
-
-## Install for local development
+## Install
 
 ```bash
-git clone https://github.com/Martin-Hausleitner/aw-importer-whoop.git
-cd aw-importer-whoop
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -e . pytest ruff
-pytest -q
+python -m pip install -e .
 ```
 
-## Configure WHOOP Developer Portal
-
-Open <https://developer-dashboard.whoop.com> and create an app.
-
-Use one redirect URL that exactly matches the local login command. Examples:
-
-- Default:
-  `http://127.0.0.1:8765/callback`
-- If another app already uses port `8765`:
-  `http://localhost:7321/callback`
-
-Required scopes:
-
-```text
-offline read:recovery read:cycles read:sleep read:workout read:profile
-```
-
-Notes:
-
-- `offline` is required so WHOOP returns a refresh token.
-- The redirect URL must match exactly, including hostname and port.
-- If you use `localhost:7321` in the portal, use `--redirect-uri http://localhost:7321/callback` locally.
-- If you use `127.0.0.1:8765` in the portal, use that exact URI locally.
-
-## OAuth login
-
-Set credentials without committing them:
+For development:
 
 ```bash
-export WHOOP_CLIENT_ID='your-client-id'
-export WHOOP_CLIENT_SECRET='your-client-secret'
-```
-
-Run login:
-
-```bash
-aw-importer-whoop login \
-  --client-id "$WHOOP_CLIENT_ID" \
-  --client-secret "$WHOOP_CLIENT_SECRET" \
-  --redirect-uri 'http://localhost:7321/callback'
-```
-
-The CLI will:
-
-- start a local callback server
-- print and open a WHOOP authorization URL
-- wait while you log in with your private WHOOP account
-- save tokens to:
-  `~/Library/Application Support/aw-importer-whoop/tokens.json`
-
-The browser success page says:
-
-```text
-WHOOP authorization complete. You can close this tab.
-```
-
-## One-shot sync
-
-```bash
-aw-importer-whoop sync --once \
-  --client-id "$WHOOP_CLIENT_ID" \
-  --client-secret "$WHOOP_CLIENT_SECRET"
-```
-
-Expected success log looks like:
-
-```text
-tick=<id> fetched=<n> inserted=<n> updated=<n> skipped=<n> next_in=0s
-```
-
-## Continuous sync
-
-```bash
-aw-importer-whoop sync \
-  --client-id "$WHOOP_CLIENT_ID" \
-  --client-secret "$WHOOP_CLIENT_SECRET" \
-  --interval 900
-```
-
-Default interval is 900 seconds / 15 minutes.
-
-
-## Backfill from a WHOOP export ZIP
-
-WHOOP email exports can be imported locally without committing raw health data.
-
-```bash
-aw-importer-whoop import-export ~/ActivityWatchImports/whoop-exports/my_whoop_data_YYYY_MM_DD.zip --dry-run
-aw-importer-whoop import-export ~/ActivityWatchImports/whoop-exports/my_whoop_data_YYYY_MM_DD.zip
-```
-
-The importer maps:
-
-- `sleeps.csv` → `aw-importer-whoop-sleep`
-- `workouts.csv` → `aw-importer-whoop-workout`
-- `physiological_cycles.csv` → `aw-importer-whoop-cycle`
-- `journal_entries.csv` → `aw-importer-whoop-journal` with free-text notes excluded by default
-
-Keep export ZIPs and extracted CSVs local. They are ignored/private data and must not be committed.
-
-## Verify in ActivityWatch
-
-List WHOOP buckets:
-
-```bash
-python3 - <<'PY'
-import json, urllib.request
-buckets = json.load(urllib.request.urlopen('http://127.0.0.1:5600/api/0/buckets/'))
-for bucket_id, meta in sorted(buckets.items()):
-    if bucket_id.startswith('aw-importer-whoop'):
-        print(bucket_id, meta.get('type'), meta.get('created'))
-PY
-```
-
-Sample expected buckets:
-
-```text
-aw-importer-whoop-cycle whoop.cycle
-aw-importer-whoop-recovery whoop.recovery
-aw-importer-whoop-sleep whoop.sleep
-aw-importer-whoop-workout whoop.workout
-```
-
-Count events:
-
-```bash
-python3 - <<'PY'
-import json, urllib.request
-base = 'http://127.0.0.1:5600/api/0'
-for bucket_id in [
-    'aw-importer-whoop-sleep',
-    'aw-importer-whoop-workout',
-    'aw-importer-whoop-cycle',
-    'aw-importer-whoop-recovery',
-]:
-    events = json.load(urllib.request.urlopen(f'{base}/buckets/{bucket_id}/events'))
-    print(bucket_id, len(events))
-PY
-```
-
-## macOS launchd service
-
-Example plist:
-
-```text
-contrib/launchd/ai.servas.aw-importer-whoop.plist
-```
-
-Before installing it:
-
-- replace the binary path with your actual venv path or installed binary
-- inject credentials through a safe local mechanism
-- never commit real secrets
-
-Suggested safer pattern:
-
-- store credentials in macOS Keychain
-- wrap the launchd command in a small local script that reads Keychain
-- keep that script outside git or make it template-only
-
-## For AI agents
-
-An AI agent can operate this importer safely if it follows these rules:
-
-- Never print or commit `WHOOP_CLIENT_SECRET`, access tokens, or refresh tokens.
-- Check callback port availability before login:
-
-```bash
-lsof -nP -iTCP:7321 -sTCP:LISTEN
-```
-
-- Start `aw-importer-whoop login` before opening the OAuth URL.
-- Wait for the browser success page.
-- Verify `tokens.json` exists without displaying its contents.
-- Run `sync --once` and inspect ActivityWatch bucket counts.
-- Only publish after a secret scan.
-
-## Security
-
-Do not commit:
-
-- `.env`
-- `.env.*`
-- `tokens.json`
-- `state.json`
-- copied Client Secrets
-- terminal logs containing OAuth URLs with temporary authorization codes
-
-The project `.gitignore` excludes common local secrets and virtualenv files.
-
-## Development
-
-```bash
+python -m pip install -e . pytest ruff
 pytest -q
 ruff check .
 ```
 
-## License
+## Configuration
 
-MIT
+- `WHOOP_CLIENT_ID` — WHOOP OAuth client id.
+- `WHOOP_CLIENT_SECRET` — WHOOP OAuth client secret.
+- ActivityWatch base URL defaults to `http://localhost:5600` in the package config.
+- OAuth tokens and importer state are stored in user data/config paths via `platformdirs`.
 
-### WHOOP export journal privacy
+## Commands
 
-`journal_entries.csv` is imported into `aw-importer-whoop-journal`, but free-text notes are never imported. Journal question text is also not stored directly by default; the importer stores a short `question_hash`/`question_slug`, `answered_yes`, and `has_notes` only.
+```bash
+# Complete local WHOOP OAuth and save tokens
+aw-importer-whoop login \
+  --client-id "$WHOOP_CLIENT_ID" \
+  --client-secret "$WHOOP_CLIENT_SECRET"
 
-This keeps habit/journal backfills useful for trend analysis without copying private journal text into ActivityWatch.
+# One-shot API sync
+aw-importer-whoop sync --once \
+  --client-id "$WHOOP_CLIENT_ID" \
+  --client-secret "$WHOOP_CLIENT_SECRET"
+
+# Sync only selected WHOOP API data types
+aw-importer-whoop sync --once --type sleep --type recovery \
+  --client-id "$WHOOP_CLIENT_ID" \
+  --client-secret "$WHOOP_CLIENT_SECRET"
+
+# Continuous API sync every 15 min by default
+aw-importer-whoop sync \
+  --client-id "$WHOOP_CLIENT_ID" \
+  --client-secret "$WHOOP_CLIENT_SECRET"
+
+# Continuous API sync with a custom interval in seconds
+aw-importer-whoop sync --interval 900 \
+  --client-id "$WHOOP_CLIENT_ID" \
+  --client-secret "$WHOOP_CLIENT_SECRET"
+
+# Import a WHOOP export ZIP into ActivityWatch
+aw-importer-whoop import-export ~/Downloads/my_whoop_data_YYYY_MM_DD.zip
+
+# Parse a ZIP without writing ActivityWatch events or importer state
+aw-importer-whoop import-export ~/Downloads/my_whoop_data_YYYY_MM_DD.zip --dry-run
+
+# Import only selected export CSV types
+aw-importer-whoop import-export ~/Downloads/my_whoop_data_YYYY_MM_DD.zip --type sleep --type journal
+```
+
+## Data flow
+
+```mermaid
+flowchart LR
+    A[WHOOP account] -->|OAuth login| B[aw-importer-whoop]
+    B -->|WHOOP API sync| C[Normalize records]
+    D[WHOOP export ZIP] -->|CSV backfill| C
+    C -->|stable hashes + replace changed records| E[(Importer state)]
+    C -->|local events| F[(ActivityWatch buckets)]
+```
+
+The SVG version is in `docs/assets/whoop-activitywatch-flow.svg`.
+
+## ActivityWatch buckets
+
+- `aw-importer-whoop-sleep`
+- `aw-importer-whoop-workout`
+- `aw-importer-whoop-cycle`
+- `aw-importer-whoop-recovery`
+- `aw-importer-whoop-journal` for export CSV journal answers.
+
+## OpenClaw skill
+
+The OpenClaw skill lives at:
+
+```text
+/Users/mh/.openclaw/workspace/skills/whoop-activitywatch-import/SKILL.md
+```
+
+The skill helper can find the latest WHOOP export email in `a.m@hausleitner.eu`, download the signed ZIP, and import it into ActivityWatch:
+
+```bash
+python3 /Users/mh/.openclaw/workspace/skills/whoop-activitywatch-import/scripts/import_latest_whoop_export.py
+```
+
+## Privacy notes
+
+- WHOOP export URLs are signed private links; do not publish them.
+- Journal note text is not imported into ActivityWatch; only whether notes exist is retained.
+- Keep OAuth credentials out of process arguments when running as a background service; prefer environment variables or a service environment file.

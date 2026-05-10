@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from zipfile import ZipFile
 
-from aw_importer_whoop.activitywatch import record_times, record_uuid, stable_hash
-from aw_importer_whoop.export import journal_records, sleep_records, workout_records
+from aw_importer_whoop.activitywatch import normalized_record, record_times, record_uuid, stable_hash
+from aw_importer_whoop.export import cycle_records, import_export, journal_records, sleep_records, workout_records
 from aw_importer_whoop.state import ImportState, parse_dt
 from aw_importer_whoop.sync import SyncLoop
 
@@ -13,7 +14,7 @@ def test_stable_hash_is_order_independent() -> None:
 
 
 def test_record_uuid_accepts_whoop_ids() -> None:
-    assert record_uuid({"sleep_id": 123}) == "123"
+    assert record_uuid({"sleep_id": "123"}) == "123"
     assert record_uuid({"id": "abc"}) == "abc"
 
 
@@ -33,7 +34,9 @@ def test_state_roundtrip(tmp_path) -> None:
 
 
 def test_sync_start_uses_six_hour_overlap(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr("aw_importer_whoop.sync.token_path", lambda: tmp_path / "tokens.json")
+    tokens = tmp_path / "tokens.json"
+    tokens.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr("aw_importer_whoop.sync.token_path", lambda: tokens)
     monkeypatch.setattr("aw_importer_whoop.sync.state_path", lambda: tmp_path / "state.json")
     loop = SyncLoop("id", "secret", data_types=("sleep",))
     loop.state.last_successful_sync_per_type["sleep"] = "2026-05-08T12:00:00+00:00"
@@ -45,26 +48,89 @@ def test_parse_dt_accepts_z_suffix() -> None:
 
 
 def test_export_sleep_record_maps_interval() -> None:
-    rows = [{"Cycle start time": "2026-05-01T00:00:00Z", "Cycle end time": "2026-05-01T08:00:00Z", "Sleep onset": "2026-05-01T00:30:00Z", "Wake onset": "2026-05-01T07:30:00Z", "Sleep performance %": "85"}]
-    rec = next(iter(sleep_records(rows)))
+    rec = next(iter(sleep_records([{
+        "Cycle start time": "2026-05-01T00:00:00Z",
+        "Cycle end time": "2026-05-01T08:00:00Z",
+        "Sleep onset": "2026-05-01T00:30:00Z",
+        "Wake onset": "2026-05-01T07:30:00Z",
+        "Sleep performance %": "85",
+    }])))
     assert rec["start"] == "2026-05-01T00:30:00+00:00"
     assert rec["end"] == "2026-05-01T07:30:00+00:00"
     assert rec["sleep_performance_percent"] == 85
 
 
 def test_export_workout_record_maps_activity() -> None:
-    rows = [{"Workout start time": "2026-05-01T12:00:00Z", "Workout end time": "2026-05-01T13:00:00Z", "Activity name": "Running", "Activity Strain": "12.3"}]
-    rec = next(iter(workout_records(rows)))
+    rec = next(iter(workout_records([{
+        "Workout start time": "2026-05-01T12:00:00Z",
+        "Workout end time": "2026-05-01T13:00:00Z",
+        "Activity name": "Running",
+        "Activity Strain": "12.3",
+        "Energy burned (cal)": "456",
+    }])))
     assert rec["activity_name"] == "Running"
     assert rec["strain"] == 12.3
+    assert rec["energy_burned_cal"] == 456
 
 
-def test_journal_records_do_not_include_private_text_or_notes() -> None:
-    rows = [{"Cycle start time": "2026-05-01T00:00:00Z", "Cycle end time": "2026-05-01T08:00:00Z", "Question text": "Did you drink alcohol?", "Answered yes": "yes", "Notes": "private note"}]
-    rec = next(iter(journal_records(rows)))
-    assert "question_text" not in rec
+def test_export_cycle_record_maps_recovery_metrics() -> None:
+    rec = next(iter(cycle_records([{
+        "Cycle start time": "2026-05-01T00:00:00Z",
+        "Cycle end time": "2026-05-02T00:00:00Z",
+        "Recovery score %": "67",
+        "Resting heart rate (bpm)": "55",
+        "Heart rate variability (ms)": "72.5",
+        "Blood oxygen %": "98",
+    }])))
+    assert rec["recovery_score_percent"] == 67
+    assert rec["resting_heart_rate_bpm"] == 55
+    assert rec["heart_rate_variability_ms"] == 72.5
+    assert rec["blood_oxygen_percent"] == 98
+
+
+def test_journal_records_do_not_include_private_notes() -> None:
+    rec = next(iter(journal_records([{
+        "Cycle start time": "2026-05-01T00:00:00Z",
+        "Cycle end time": "2026-05-01T08:00:00Z",
+        "Question text": "Did you drink alcohol?",
+        "Answered yes": "yes",
+        "Notes": "private note",
+    }])))
+    assert rec["question"] == "Did you drink alcohol?"
+    assert rec["question_slug"] == "did-you-drink-alcohol"
     assert "Notes" not in rec
     assert "notes" not in rec
-    assert rec["question_hash"]
-    assert rec["question_slug"] == "did-you-drink-alcohol"
     assert rec["has_notes"] is True
+
+
+def test_normalized_record_keeps_export_metrics_without_raw_notes() -> None:
+    data = normalized_record("sleep", {
+        "sleep_id": "s1",
+        "source": "whoop_export_csv",
+        "sleep_performance_percent": 91,
+        "Notes": "private note",
+    })
+    assert data["sleep_performance_percent"] == 91
+    assert "Notes" not in data
+    assert "raw" not in data
+
+
+def test_import_export_dry_run_reads_zip_without_activitywatch_or_state(monkeypatch, tmp_path) -> None:
+    zip_path = tmp_path / "whoop-export.zip"
+    with ZipFile(zip_path, "w") as zf:
+        zf.writestr(
+            "sleeps.csv",
+            "Cycle start time,Cycle end time,Sleep onset,Wake onset,Sleep performance %\n"
+            "2026-05-01T00:00:00Z,2026-05-01T08:00:00Z,2026-05-01T00:30:00Z,2026-05-01T07:30:00Z,88\n",
+        )
+
+    state_file = tmp_path / "state.json"
+    monkeypatch.setattr("aw_importer_whoop.export.state_path", lambda: state_file)
+
+    stats = import_export(zip_path, ("sleep",), dry_run=True)
+
+    assert stats.parsed == 1
+    assert stats.inserted == 1
+    assert stats.updated == 0
+    assert stats.skipped == 0
+    assert not state_file.exists()
