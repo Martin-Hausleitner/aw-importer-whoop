@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Iterable
 
-from .activitywatch import ActivityWatchClient, record_uuid, stable_hash
+from .activitywatch import ActivityWatchClient, EVENT_DATA_SCHEMA_VERSION, record_uuid, stable_hash
 from .config import DATA_TYPES, DEFAULT_INTERVAL_SECONDS, OVERLAP_SECONDS, state_path, token_path
 from .state import ImportState, parse_dt, utcnow
 from .whoop import WhoopClient
@@ -57,7 +57,7 @@ class SyncLoop:
             for record in self.whoop.paged(data_type, self._start_for(data_type), now):
                 stats.fetched += 1
                 rid = f"{data_type}:{record_uuid(record)}"
-                h = stable_hash(record)
+                h = stable_hash({"event_data_schema_version": EVENT_DATA_SCHEMA_VERSION, "record": record})
                 old = self.state.record_hashes.get(rid)
                 if old == h:
                     stats.skipped += 1

@@ -126,6 +126,25 @@ def import_export_command(path: Path, data_types: tuple[str, ...], dry_run: bool
     )
 
 
+@main.command("repair-existing")
+@click.option("--type", "data_types", multiple=True, type=click.Choice(["sleep", "workout", "cycle", "recovery", "journal"]), help="Limit repair to one or more ActivityWatch WHOOP buckets.")
+@click.option("--days", default=365, show_default=True, type=click.IntRange(1), help="How far back to scan ActivityWatch events.")
+@click.option("--dry-run", is_flag=True, help="Report repairs without writing ActivityWatch events.")
+def repair_existing_command(data_types: tuple[str, ...], days: int, dry_run: bool) -> None:
+    """Backfill missing flattened WHOOP fields into existing ActivityWatch events."""
+    from .activitywatch import ActivityWatchClient
+
+    stats = ActivityWatchClient().repair_existing_events(
+        data_types or ("sleep", "workout", "cycle", "recovery", "journal"),
+        days=days,
+        dry_run=dry_run,
+    )
+    click.echo(
+        f"scanned={stats['scanned']} updated={stats['updated']} "
+        f"skipped={stats['skipped']} dry_run={dry_run}"
+    )
+
+
 class _CallbackHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 - stdlib API
         parsed = urllib.parse.urlparse(self.path)

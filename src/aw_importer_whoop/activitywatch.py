@@ -11,6 +11,39 @@ import httpx
 from .config import AW_BASE_URL
 
 BUCKET_PREFIX = "aw-importer-whoop"
+EVENT_DATA_SCHEMA_VERSION = 2
+
+SUMMARY_KEYS = {
+    "id", "sleep_id", "workout_id", "cycle_id", "recovery_id",
+    "start", "end", "start_time", "end_time", "created_at", "updated_at",
+    "score_state", "timezone_offset", "timezone", "source",
+    "strain", "kilojoule", "energy_kilojoule",
+    "average_heart_rate", "average_heart_rate_bpm",
+    "max_heart_rate", "max_heart_rate_bpm",
+    "sport_id", "nap", "cycle_start", "cycle_end",
+    "sleep_performance_percent", "respiratory_rate_rpm", "asleep_duration_min",
+    "in_bed_duration_min", "light_sleep_duration_min", "deep_sws_duration_min",
+    "rem_duration_min", "activity_name", "duration_min",
+    "recovery_score", "recovery_score_percent",
+    "resting_heart_rate", "resting_heart_rate_bpm",
+    "hrv_rmssd_milli", "heart_rate_variability_ms",
+    "spo2_percentage", "blood_oxygen_percent",
+    "skin_temp_celsius", "energy_burned_cal",
+    "user_calibrating", "question", "question_slug", "answered_yes", "has_notes",
+}
+
+SCORE_ALIASES = {
+    "strain": ("strain",),
+    "kilojoule": ("kilojoule", "energy_kilojoule"),
+    "average_heart_rate": ("average_heart_rate", "average_heart_rate_bpm"),
+    "max_heart_rate": ("max_heart_rate", "max_heart_rate_bpm"),
+    "recovery_score": ("recovery_score", "recovery_score_percent"),
+    "resting_heart_rate": ("resting_heart_rate", "resting_heart_rate_bpm"),
+    "hrv_rmssd_milli": ("hrv_rmssd_milli", "heart_rate_variability_ms"),
+    "spo2_percentage": ("spo2_percentage", "blood_oxygen_percent"),
+    "skin_temp_celsius": ("skin_temp_celsius",),
+    "user_calibrating": ("user_calibrating",),
+}
 
 
 def stable_hash(record: dict[str, Any]) -> str:
@@ -57,9 +90,62 @@ def normalized_record(data_type: str, record: dict[str, Any], include_raw: bool 
         "energy_burned_cal", "question", "question_slug", "answered_yes", "has_notes",
     }
     data = {k: record[k] for k in keys if k in record}
+    data.update(flatten_score(record.get("score")))
     if include_raw:
         data["raw"] = record
     return data
+
+
+def flatten_score(score: Any) -> dict[str, Any]:
+    if not isinstance(score, dict):
+        return {}
+    data: dict[str, Any] = {}
+    for source_key, aliases in SCORE_ALIASES.items():
+        if source_key not in score or score[source_key] is None:
+            continue
+        for alias in aliases:
+            data[alias] = score[source_key]
+    return data
+
+
+def event_data_for_record(data_type: str, record: dict[str, Any], include_raw: bool = False) -> dict[str, Any]:
+    rid = record_uuid(record)
+    normalized = normalized_record(data_type, record, include_raw)
+    timestamp, duration = record_times(record)
+    data = {
+        "whoop_schema_version": EVENT_DATA_SCHEMA_VERSION,
+        "whoop_id": rid,
+        "data_type": data_type,
+        "duration_seconds": duration,
+        "duration_minutes": round(duration / 60, 3),
+        "duration_hours": round(duration / 3600, 3),
+        "record": normalized,
+    }
+    for key in SUMMARY_KEYS:
+        if key in normalized:
+            data[key] = normalized[key]
+    data.setdefault("start", timestamp)
+    remove_empty(data)
+    return data
+
+
+def needs_data_repair(data_type: str, existing_data: dict[str, Any], include_raw: bool = False) -> tuple[bool, dict[str, Any]]:
+    record = existing_data.get("record")
+    if not isinstance(record, dict):
+        return False, existing_data
+    repaired = event_data_for_record(data_type, record, include_raw)
+    for key, value in existing_data.items():
+        if key == "record":
+            continue
+        repaired.setdefault(key, value)
+    repaired["record"] = existing_data["record"]
+    return repaired != existing_data, repaired
+
+
+def remove_empty(data: dict[str, Any]) -> None:
+    for key in list(data):
+        if data[key] is None:
+            del data[key]
 
 
 class ActivityWatchClient:
@@ -93,11 +179,7 @@ class ActivityWatchClient:
         event = {
             "timestamp": timestamp,
             "duration": duration,
-            "data": {
-                "whoop_id": rid,
-                "data_type": data_type,
-                "record": normalized_record(data_type, record, self.include_raw),
-            },
+            "data": event_data_for_record(data_type, record, self.include_raw),
         }
         with httpx.Client(timeout=self.timeout) as client:
             stale_ids = [] if old_event_id is None else [old_event_id]
@@ -116,6 +198,43 @@ class ActivityWatchClient:
                 if delete.status_code not in (200, 404):
                     delete.raise_for_status()
             return int(new_id) if new_id is not None else -1
+
+    def repair_existing_events(self, data_types: tuple[str, ...], days: int = 365, dry_run: bool = False) -> dict[str, int]:
+        stats = {"scanned": 0, "updated": 0, "skipped": 0}
+        end_dt = datetime.now().astimezone() + timedelta(days=1)
+        start_dt = end_dt - timedelta(days=days)
+        with httpx.Client(timeout=self.timeout) as client:
+            for data_type in data_types:
+                bucket_id = f"{BUCKET_PREFIX}-{data_type}"
+                r = client.get(
+                    f"{self.base_url}/buckets/{bucket_id}/events",
+                    params={"start": start_dt.isoformat(), "end": end_dt.isoformat()},
+                )
+                if r.status_code == 404:
+                    continue
+                r.raise_for_status()
+                for event in r.json():
+                    stats["scanned"] += 1
+                    data = event.get("data") or {}
+                    needs_repair, repaired_data = needs_data_repair(data_type, data, self.include_raw)
+                    if not needs_repair:
+                        stats["skipped"] += 1
+                        continue
+                    stats["updated"] += 1
+                    if dry_run:
+                        continue
+                    repaired_event = {
+                        "timestamp": event["timestamp"],
+                        "duration": event.get("duration", 0),
+                        "data": repaired_data,
+                    }
+                    inserted = client.post(f"{self.base_url}/buckets/{bucket_id}/events", json=repaired_event)
+                    inserted.raise_for_status()
+                    if event.get("id") is not None:
+                        deleted = client.delete(f"{self.base_url}/buckets/{bucket_id}/events/{event['id']}")
+                        if deleted.status_code not in (200, 404):
+                            deleted.raise_for_status()
+        return stats
 
     def _find_matching_event_ids(
         self,

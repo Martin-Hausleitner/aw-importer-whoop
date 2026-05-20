@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from zipfile import ZipFile
 
-from aw_importer_whoop.activitywatch import normalized_record, record_times, record_uuid, stable_hash
+from aw_importer_whoop.activitywatch import event_data_for_record, needs_data_repair, normalized_record, record_times, record_uuid, stable_hash
 from aw_importer_whoop.export import cycle_records, import_export, journal_records, sleep_records, workout_records
 from aw_importer_whoop.state import ImportState, parse_dt
 from aw_importer_whoop.sync import SyncLoop
@@ -113,6 +113,75 @@ def test_normalized_record_keeps_export_metrics_without_raw_notes() -> None:
     assert data["sleep_performance_percent"] == 91
     assert "Notes" not in data
     assert "raw" not in data
+
+
+def test_normalized_record_flattens_cycle_score_metrics() -> None:
+    data = normalized_record("cycle", {
+        "id": 123,
+        "start": "2026-05-20T01:00:00Z",
+        "end": "2026-05-21T00:00:00Z",
+        "score_state": "SCORED",
+        "score": {
+            "strain": 10.5,
+            "kilojoule": 6339.9,
+            "average_heart_rate": 73,
+            "max_heart_rate": 176,
+        },
+    })
+
+    assert data["strain"] == 10.5
+    assert data["kilojoule"] == 6339.9
+    assert data["energy_kilojoule"] == 6339.9
+    assert data["average_heart_rate"] == 73
+    assert data["average_heart_rate_bpm"] == 73
+    assert data["max_heart_rate"] == 176
+    assert data["max_heart_rate_bpm"] == 176
+
+
+def test_event_data_for_record_adds_queryable_top_level_fields() -> None:
+    data = event_data_for_record("cycle", {
+        "id": 123,
+        "start": "2026-05-20T01:00:00Z",
+        "end": "2026-05-21T00:00:00Z",
+        "score_state": "SCORED",
+        "score": {
+            "strain": 10.5,
+            "kilojoule": 6339.9,
+            "average_heart_rate": 73,
+            "max_heart_rate": 176,
+        },
+    })
+
+    assert data["whoop_schema_version"] == 2
+    assert data["whoop_id"] == "123"
+    assert data["data_type"] == "cycle"
+    assert data["start"] == "2026-05-20T01:00:00Z"
+    assert data["end"] == "2026-05-21T00:00:00Z"
+    assert data["duration_hours"] == 23
+    assert data["strain"] == 10.5
+    assert data["energy_kilojoule"] == 6339.9
+    assert data["average_heart_rate_bpm"] == 73
+    assert data["record"]["score"]["strain"] == 10.5
+
+
+def test_needs_data_repair_detects_missing_top_level_fields() -> None:
+    old_data = {
+        "whoop_id": "123",
+        "data_type": "cycle",
+        "record": {
+            "id": 123,
+            "start": "2026-05-20T01:00:00Z",
+            "end": "2026-05-21T00:00:00Z",
+            "score": {"strain": 10.5},
+        },
+    }
+
+    needs_repair, repaired = needs_data_repair("cycle", old_data)
+
+    assert needs_repair is True
+    assert repaired["whoop_schema_version"] == 2
+    assert repaired["strain"] == 10.5
+    assert repaired["record"] == old_data["record"]
 
 
 def test_import_export_dry_run_reads_zip_without_activitywatch_or_state(monkeypatch, tmp_path) -> None:

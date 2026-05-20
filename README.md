@@ -81,6 +81,12 @@ aw-importer-whoop import-export ~/Downloads/my_whoop_data_YYYY_MM_DD.zip --dry-r
 
 # Import only selected export CSV types
 aw-importer-whoop import-export ~/Downloads/my_whoop_data_YYYY_MM_DD.zip --type sleep --type journal
+
+# Backfill flattened/queryable fields into existing ActivityWatch WHOOP events
+aw-importer-whoop repair-existing --days 365
+
+# Preview the repair without writing ActivityWatch events
+aw-importer-whoop repair-existing --days 365 --dry-run
 ```
 
 ## Data flow
@@ -103,6 +109,33 @@ The SVG version is in `docs/assets/whoop-activitywatch-flow.svg`.
 - `aw-importer-whoop-cycle`
 - `aw-importer-whoop-recovery`
 - `aw-importer-whoop-journal` for export CSV journal answers.
+
+## ActivityWatch event data
+
+Each event keeps the normalized WHOOP record under `record`, and also writes the most useful fields at top level so ActivityWatch queries, exports, and timelines do not need to understand nested WHOOP API shapes.
+
+Common top-level fields:
+
+- `whoop_schema_version`, `whoop_id`, `data_type`
+- `start`, `end`, `duration_seconds`, `duration_minutes`, `duration_hours`
+- `score_state`, `created_at`, `updated_at`, `timezone_offset`
+
+Cycle/workout strain fields:
+
+- `strain`
+- `kilojoule` and `energy_kilojoule`
+- `average_heart_rate` and `average_heart_rate_bpm`
+- `max_heart_rate` and `max_heart_rate_bpm`
+
+Recovery fields:
+
+- `recovery_score` and `recovery_score_percent`
+- `resting_heart_rate` and `resting_heart_rate_bpm`
+- `hrv_rmssd_milli` and `heart_rate_variability_ms`
+- `spo2_percentage` and `blood_oxygen_percent`
+- `skin_temp_celsius`
+
+Sleep/export fields include sleep performance, respiratory rate, sleep-stage minutes, activity names, journal question slugs, and the same raw-safe normalized `record`.
 
 ## OpenClaw skill
 
