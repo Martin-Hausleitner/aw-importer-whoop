@@ -13,6 +13,7 @@ This repository imports the user's own WHOOP data into local ActivityWatch.
 - Never commit WHOOP export ZIPs, CSVs, OAuth tokens, ActivityWatch dumps, or personal health summaries.
 - Treat WHOOP export email links as private signed URLs.
 - Keep `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, access tokens, and refresh tokens out of logs and commits.
+- Do not search email, open signed export links, or download a WHOOP export without explicit user approval for that run.
 - Journal note text is intentionally not imported into ActivityWatch. Preserve that behavior.
 
 ## Development Loop
@@ -29,9 +30,11 @@ ActivityWatch is expected at `http://127.0.0.1:5600/api/0`.
 
 ## Operational Checklist
 
-- For API sync, create/use a WHOOP developer app, register `http://127.0.0.1:8765/callback`, run `aw-importer-whoop login`, then run `aw-importer-whoop sync --once` first.
-- For export backfills, request the WHOOP data export, download the ZIP privately, run `import-export --dry-run`, then import.
-- After imports, verify `aw-importer-whoop-*` buckets in ActivityWatch.
+- For API sync, create/use a WHOOP developer app, register `http://127.0.0.1:8765/callback`, request only `offline read:recovery read:cycles read:sleep read:workout`, run `aw-importer-whoop login`, then run `aw-importer-whoop sync --once` first.
+- API sync fetches from the last saved cursor; fresh state starts around the last 30 days. Use export imports for older history.
+- Run only one sync process per user/config directory because refresh tokens rotate and state is file-backed.
+- For export backfills, request the WHOOP data export, keep the archive outside the repo, run `import-export --dry-run`, then import.
+- After imports, verify `aw-importer-whoop-*` buckets, event counts, and journal-note privacy in ActivityWatch.
 
 ## When Changing Code
 

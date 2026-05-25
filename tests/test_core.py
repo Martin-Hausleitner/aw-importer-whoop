@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from zipfile import ZipFile
 
 from aw_importer_whoop.activitywatch import event_data_for_record, needs_data_repair, normalized_record, record_times, record_uuid, stable_hash
+from aw_importer_whoop.config import SCOPES
 from aw_importer_whoop.export import cycle_records, import_export, journal_records, sleep_records, workout_records
 from aw_importer_whoop.state import ImportState, parse_dt
 from aw_importer_whoop.sync import SyncLoop
@@ -11,6 +12,11 @@ from aw_importer_whoop.sync import SyncLoop
 
 def test_stable_hash_is_order_independent() -> None:
     assert stable_hash({"b": 2, "a": 1}) == stable_hash({"a": 1, "b": 2})
+
+
+def test_oauth_scopes_are_minimal_for_imported_data() -> None:
+    assert "read:profile" not in SCOPES
+    assert "read:body_measurement" not in SCOPES
 
 
 def test_record_uuid_accepts_whoop_ids() -> None:

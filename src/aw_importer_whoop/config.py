@@ -10,7 +10,7 @@ WHOOP_BASE_URL = "https://api.prod.whoop.com/developer"
 WHOOP_AUTH_URL = "https://api.prod.whoop.com/oauth/oauth2/auth"
 WHOOP_TOKEN_URL = "https://api.prod.whoop.com/oauth/oauth2/token"
 REDIRECT_URI = "http://127.0.0.1:8765/callback"
-SCOPES = "offline read:recovery read:cycles read:sleep read:workout read:profile"
+SCOPES = "offline read:recovery read:cycles read:sleep read:workout"
 AW_BASE_URL = "http://127.0.0.1:5600/api/0"
 DATA_TYPES = ("sleep", "workout", "cycle", "recovery")
 

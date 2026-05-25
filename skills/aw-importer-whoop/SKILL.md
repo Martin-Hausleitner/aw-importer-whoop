@@ -32,6 +32,7 @@ curl -fsS http://127.0.0.1:5600/api/0/info
 - Do not commit WHOOP exports, CSVs, OAuth tokens, ActivityWatch dumps, or personal health summaries.
 - Do not print private signed export URLs unless the user explicitly asks.
 - Keep `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, access tokens, and refresh tokens out of logs and commits.
+- Do not search email, open signed export links, or download a WHOOP export without explicit user approval for that run.
 - Preserve the journal privacy behavior: import answer metadata and `has_notes`, but not journal note text.
 
 ## OAuth API Sync
@@ -41,39 +42,41 @@ Use this path for recurring WHOOP API data: sleep, workout, cycle, and recovery.
 1. Open the WHOOP Developer Dashboard from `https://developer.whoop.com/`.
 2. Create or use an app for this local importer.
 3. Register this redirect URI exactly: `http://127.0.0.1:8765/callback`.
-4. Request only the scopes this repo uses: `offline read:recovery read:cycles read:sleep read:workout read:profile`.
-5. Store credentials in environment variables, not shell history when possible:
-
-```bash
-export WHOOP_CLIENT_ID="..."
-export WHOOP_CLIENT_SECRET="..."
-```
+4. Request only the scopes this repo uses: `offline read:recovery read:cycles read:sleep read:workout`.
+5. Do not request `read:profile` or `read:body_measurement` unless code has been updated to import that data and the user explicitly wants it.
 
 Log in:
 
 ```bash
-aw-importer-whoop login \
-  --client-id "$WHOOP_CLIENT_ID" \
-  --client-secret "$WHOOP_CLIENT_SECRET"
+WHOOP_CLIENT_ID="..." WHOOP_CLIENT_SECRET="..." aw-importer-whoop login
 ```
 
 The command starts a one-request local callback server, opens the WHOOP authorization URL, and saves tokens with private file permissions under the platform-specific user config directory. If browser opening is not useful, add `--no-open-browser`, copy the printed URL, sign in, authorize, and let WHOOP redirect back to the local callback.
 
+To locate token/state files:
+
+```bash
+python3 -c 'from aw_importer_whoop.config import token_path,state_path; print(token_path()); print(state_path())'
+```
+
+Token files must be mode `0600`. Delete tokens only when intentionally logging out or switching WHOOP accounts.
+
 Run the first sync as a one-shot:
 
 ```bash
-aw-importer-whoop sync --once \
-  --client-id "$WHOOP_CLIENT_ID" \
-  --client-secret "$WHOOP_CLIENT_SECRET"
+WHOOP_CLIENT_ID="..." WHOOP_CLIENT_SECRET="..." aw-importer-whoop sync --once
 ```
+
+API sync starts from the last saved cursor; on a fresh state it fetches only about the last 30 days. Use WHOOP export imports for older history.
 
 Limit data types while debugging:
 
 ```bash
-aw-importer-whoop sync --once --type sleep --type recovery \
-  --client-id "$WHOOP_CLIENT_ID" \
-  --client-secret "$WHOOP_CLIENT_SECRET"
+WHOOP_CLIENT_ID="..." WHOOP_CLIENT_SECRET="..." \
+  aw-importer-whoop sync --once --type sleep --type recovery
 ```
+
+For long-running services, use a private env file or keychain wrapper; do not put secrets in service `ExecStart` lines, shell history, or shared logs.
 
 Common OAuth failures:
 
@@ -81,10 +84,13 @@ Common OAuth failures:
 - No tokens found: run `aw-importer-whoop login` again.
 - 401 after prior success: refresh token may have rotated or been revoked; log in again.
 - 429: the client already retries with `Retry-After`; avoid tight manual loops.
+- Concurrent syncs: run only one `sync` process at a time for a given user/config directory. Refresh tokens rotate, and concurrent syncs can invalidate each other or race on importer state.
 
 ## WHOOP Export ZIP Backfill
 
 Use this path for historical CSV export imports. As of the current WHOOP support docs, personal data exports are requested in the WHOOP mobile app via More/App Settings/Data Export, and the export email can take up to 24 hours. Treat the emailed download link as a private signed URL.
+
+Keep export archives outside the repo, for example `~/Downloads` or a private temp directory. Do not unzip into the repository. Inspect contents with `zipinfo -1 "$ZIP"` only if needed. After successful import and user approval, move the archive to Trash or another private archive location.
 
 Expected files inside the ZIP:
 
@@ -93,7 +99,7 @@ Expected files inside the ZIP:
 - `physiological_cycles.csv`
 - `journal_entries.csv`
 
-Always dry-run first:
+Always dry-run first. The importer accepts normal ZIPs and gzip-wrapped ZIP downloads:
 
 ```bash
 aw-importer-whoop import-export ~/Downloads/my_whoop_data_YYYY_MM_DD.zip --dry-run
@@ -132,6 +138,12 @@ Expected buckets include:
 - `aw-importer-whoop-cycle`
 - `aw-importer-whoop-recovery`
 - `aw-importer-whoop-journal`
+
+After import, verify event counts and journal privacy:
+
+- Query each expected `aw-importer-whoop-*` bucket for the imported time range and confirm nonzero events when expected.
+- For `aw-importer-whoop-journal`, inspect one event locally and confirm there is `has_notes` but no `Notes`, `notes`, or raw note text field.
+- Do not paste event payloads into chat unless the user asks; summarize counts only.
 
 ## Repair Existing Events
 

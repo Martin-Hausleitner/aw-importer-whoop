@@ -21,7 +21,7 @@ Import your own WHOOP data into local ActivityWatch.
 ## Requirements
 
 - Python 3.11+
-- Local ActivityWatch server, default: `http://localhost:5600`
+- Local ActivityWatch server. The package API base defaults to `http://127.0.0.1:5600/api/0`.
 - For API sync: WHOOP OAuth client credentials.
 
 ## Install
@@ -42,38 +42,29 @@ ruff check .
 
 - `WHOOP_CLIENT_ID` — WHOOP OAuth client id.
 - `WHOOP_CLIENT_SECRET` — WHOOP OAuth client secret.
-- ActivityWatch base URL defaults to `http://localhost:5600` in the package config.
-- OAuth tokens and importer state are stored in user data/config paths via `platformdirs`.
+- ActivityWatch API base URL defaults to `http://127.0.0.1:5600/api/0` in the package config.
+- OAuth tokens and importer state are stored as `tokens.json` and `state.json` under the `platformdirs` user config directory for `aw-importer-whoop`.
 
 ## Commands
 
 ```bash
 # Complete local WHOOP OAuth and save tokens
-aw-importer-whoop login \
-  --client-id "$WHOOP_CLIENT_ID" \
-  --client-secret "$WHOOP_CLIENT_SECRET"
+WHOOP_CLIENT_ID="..." WHOOP_CLIENT_SECRET="..." aw-importer-whoop login
 
 # One-shot API sync
-aw-importer-whoop sync --once \
-  --client-id "$WHOOP_CLIENT_ID" \
-  --client-secret "$WHOOP_CLIENT_SECRET"
+WHOOP_CLIENT_ID="..." WHOOP_CLIENT_SECRET="..." aw-importer-whoop sync --once
 
 # Sync only selected WHOOP API data types
-aw-importer-whoop sync --once --type sleep --type recovery \
-  --client-id "$WHOOP_CLIENT_ID" \
-  --client-secret "$WHOOP_CLIENT_SECRET"
+WHOOP_CLIENT_ID="..." WHOOP_CLIENT_SECRET="..." \
+  aw-importer-whoop sync --once --type sleep --type recovery
 
 # Continuous API sync every 15 min by default
-aw-importer-whoop sync \
-  --client-id "$WHOOP_CLIENT_ID" \
-  --client-secret "$WHOOP_CLIENT_SECRET"
+WHOOP_CLIENT_ID="..." WHOOP_CLIENT_SECRET="..." aw-importer-whoop sync
 
 # Continuous API sync with a custom interval in seconds
-aw-importer-whoop sync --interval 900 \
-  --client-id "$WHOOP_CLIENT_ID" \
-  --client-secret "$WHOOP_CLIENT_SECRET"
+WHOOP_CLIENT_ID="..." WHOOP_CLIENT_SECRET="..." aw-importer-whoop sync --interval 900
 
-# Import a WHOOP export ZIP into ActivityWatch
+# Import a WHOOP export ZIP or gzip-wrapped ZIP into ActivityWatch
 aw-importer-whoop import-export ~/Downloads/my_whoop_data_YYYY_MM_DD.zip
 
 # Parse a ZIP without writing ActivityWatch events or importer state
@@ -163,5 +154,6 @@ python3 /Users/mh/.openclaw/workspace/skills/whoop-activitywatch-import/scripts/
 ## Privacy notes
 
 - WHOOP export URLs are signed private links; do not publish them.
+- Do not search email, open signed export links, or download a WHOOP export without explicit approval for that run.
 - Journal note text is not imported into ActivityWatch; only whether notes exist is retained.
 - Keep OAuth credentials out of process arguments when running as a background service; prefer environment variables or a service environment file.
