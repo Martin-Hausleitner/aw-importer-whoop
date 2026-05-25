@@ -1,0 +1,4 @@
+interface:
+  display_name: "AW WHOOP Importer"
+  short_description: "Operate and maintain the WHOOP to ActivityWatch importer."
+  default_prompt: "Use the AW WHOOP Importer skill to log in, import WHOOP exports, sync WHOOP API data, or maintain the repository."

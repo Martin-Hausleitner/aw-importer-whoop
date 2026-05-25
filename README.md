@@ -139,6 +139,15 @@ Sleep/export fields include sleep performance, respiratory rate, sleep-stage min
 
 ## OpenClaw skill
 
+Agents working in this repository should start with:
+
+```text
+AGENTS.md
+skills/aw-importer-whoop/SKILL.md
+```
+
+The repo-local skill is the canonical agent runbook for OAuth setup, export ZIP backfills, ActivityWatch verification, and repository maintenance.
+
 The OpenClaw skill lives at:
 
 ```text
