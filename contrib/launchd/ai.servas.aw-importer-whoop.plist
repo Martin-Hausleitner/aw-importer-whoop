@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>ai.servas.aw-importer-whoop</string>
-  <key>ProgramArguments</key><array><string>/Users/YOU/Library/Application Support/aw-activitywatch-stack/sync-whoop-keychain.sh</string></array>
+  <key>ProgramArguments</key><array><string>/Users/YOU/Documents/Playground/aw-importer-whoop/contrib/launchd/sync-whoop-keychain.sh</string></array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>StandardOutPath</key><string>/Users/YOU/Library/Logs/aw-activitywatch-stack/whoop.out.log</string>

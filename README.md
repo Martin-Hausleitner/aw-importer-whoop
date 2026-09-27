@@ -157,3 +157,9 @@ python3 /Users/mh/.openclaw/workspace/skills/whoop-activitywatch-import/scripts/
 - Do not search email, open signed export links, or download a WHOOP export without explicit approval for that run.
 - Journal note text is not imported into ActivityWatch; only whether notes exist is retained.
 - Keep OAuth credentials out of process arguments when running as a background service; prefer environment variables or a service environment file.
+
+## Troubleshooting: sync stopped
+
+- **Checkout moved** — the launchd wrapper `contrib/launchd/sync-whoop-keychain.sh` reads the repo path from `AW_WHOOP_DIR` (default `~/Documents/Playground/aw-importer-whoop`) and exits with code 78 when the venv is missing, so `launchctl list` shows the problem instead of a silent retry loop.
+- **Keychain items** — `aw-importer-whoop-client-id` and `aw-importer-whoop-client-secret` (account = your login user). No client id literal in scripts.
+- **Backfill** — the sync cursor resumes from the last successful tick (minus 6 h overlap), so a restart after an outage backfills automatically. WHOOP v2 pages are fetched with `limit=25` and followed via the body field `next_token`.

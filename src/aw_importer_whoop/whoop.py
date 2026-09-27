@@ -11,6 +11,8 @@ import httpx
 
 from .config import WHOOP_BASE_URL, WHOOP_TOKEN_URL
 
+PAGE_LIMIT = 25  # WHOOP v2 maximum page size
+
 ENDPOINTS = {
     "sleep": "/v2/activity/sleep",
     "workout": "/v2/activity/workout",
@@ -67,7 +69,7 @@ class WhoopClient:
         next_token: str | None = None
         while True:
             self.refresh_if_needed()
-            params: dict[str, str] = {"start": start.isoformat(), "end": end.isoformat()}
+            params: dict[str, str] = {"start": start.isoformat(), "end": end.isoformat(), "limit": str(PAGE_LIMIT)}
             if next_token:
                 params["nextToken"] = next_token
             headers = {"Authorization": f"Bearer {self.tokens['access_token']}"}
@@ -86,7 +88,8 @@ class WhoopClient:
             payload = r.json()
             records = payload.get("records") or []
             yield from records
-            next_token = payload.get("nextToken")
+            # WHOOP v2 returns `next_token` in the body; the request param is `nextToken`.
+            next_token = payload.get("next_token") or payload.get("nextToken")
             if not next_token:
                 return
 
