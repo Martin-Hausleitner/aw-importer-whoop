@@ -74,7 +74,7 @@ class WhoopClient:
             with httpx.Client(timeout=self.timeout) as client:
                 for attempt in range(4):
                     r = client.get(WHOOP_BASE_URL + endpoint, params=params, headers=headers)
-                    if r.status_code == 429:
+                    if r.status_code == 429 and attempt < 3:
                         wait = int(r.headers.get("Retry-After", "1"))
                         time.sleep(wait)
                         continue
@@ -86,7 +86,7 @@ class WhoopClient:
             payload = r.json()
             records = payload.get("records") or []
             yield from records
-            next_token = payload.get("nextToken")
+            next_token = payload.get("next_token")
             if not next_token:
                 return
 
