@@ -45,6 +45,67 @@ ruff check .
 - ActivityWatch API base URL defaults to `http://127.0.0.1:5600/api/0` in the package config.
 - OAuth tokens and importer state are stored as `tokens.json` and `state.json` under the `platformdirs` user config directory for `aw-importer-whoop`.
 
+### Optional Home Assistant feed
+
+The existing official API sync can send a small allowlisted projection to the
+`whoop_official` custom integration in Home Assistant. It does not read mixed
+ActivityWatch buckets or CSV exports. WHOOP credentials stay with the existing
+Mac sync owner; Home Assistant receives no WHOOP token and performs no refresh.
+
+Opt in by placing this reference-only configuration at
+`config_dir()/home-assistant-feed/config.json` (on macOS,
+`~/Library/Application Support/aw-importer-whoop/home-assistant-feed/config.json`):
+
+```json
+{
+  "source_id": "primary",
+  "ha_credentials_file": "~/.config/home-assistant/credentials.json",
+  "bootstrap_days": 2
+}
+```
+
+The referenced existing Home Assistant credential store must use the schema
+`{"url": "<existing HA origin>", "token": "<existing bearer>"}`. Keep actual values
+outside this repository. All configuration, credential and cache files must be
+owned regular files with mode `0600`, one hardlink and no symlinks; their direct
+parents must be owned directories with mode `0700`. The publisher never changes
+permissions or copies credentials. `--ha-config /absolute/private/config.json`
+selects another private configuration. A missing default file keeps the feature
+off. An invalid configuration disables the feed with a constant safe log code.
+
+Activate it through the existing sync owner, retaining its wrapper, account and
+interval. Do not start another importer, login, export, timer or refresh owner.
+The package's default interval remains 900 seconds; an installed wrapper may
+already select another interval (the existing Mac owner uses 3600 seconds).
+An exclusive private publisher lock prevents a second enabled publisher.
+
+Only a successful tick covering all four API resource types, including all
+pages and a successful importer-state save, advances the feed clock. Selective
+`--type` maintenance imports leave it unchanged. The cold feed may extend the
+same owner's first complete query window by up to two days, without resetting
+any provider cursor. Later ticks use the existing overlap window. Records that
+are already unchanged in ActivityWatch still contribute to the official feed.
+
+The feed includes only numeric recovery, cycle, main-sleep and workout metrics
+with their original measurement timestamps and score state. Main sleep excludes
+naps. Missing or unscored values stay missing, while a real zero remains zero.
+Latest period takes precedence over amendment time. Mixed or changed accounts,
+non-finite numbers, invalid intervals and implausible transport values reject a
+staged feed. The private cache retains only minimal metrics, ordering timestamps
+and a hashed account binding; it contains no raw record identifiers or tokens.
+
+The publisher sends at most 64 KiB to `/api/whoop_official/{source_id}` using the
+existing HA origin and bearer, with redirects and environment proxies disabled.
+It records a minimal pending frame atomically before transport and requires the
+integration's `accepted: true` acknowledgement. HA failure preserves the
+successful WHOOP state and normal cadence; another delivery can occur only on
+the next regular complete tick. Logs contain constant codes, never request
+bodies, health values, URLs, tokens or exception strings. Private pending/cache
+state and logs are operational material and must stay out of Git.
+
+Synthetic tests verify the software contract. Installation, real official data
+arrival and visible Home Assistant entities remain separate acceptance checks.
+
 ## Commands
 
 ```bash

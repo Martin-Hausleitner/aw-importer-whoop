@@ -22,6 +22,7 @@ from .config import (
     token_path,
 )
 from .sync import SyncLoop
+from .home_assistant import PublisherBusy, optional_publisher
 
 LOG_FORMAT = "time=%(asctime)s level=%(levelname)s logger=%(name)s msg=%(message)s"
 
@@ -42,11 +43,23 @@ def main() -> None:
 @click.option("--once", is_flag=True, help="Run exactly one sync tick, then exit.")
 @click.option("--type", "data_types", multiple=True, type=click.Choice(["sleep", "workout", "cycle", "recovery"]), help="Limit sync to one or more data types.")
 @click.option("--verbose", is_flag=True, help="Enable debug logging.")
-def sync(client_id: str, client_secret: str, interval: int, once: bool, data_types: tuple[str, ...], verbose: bool) -> None:
+@click.option("--ha-config", type=click.Path(dir_okay=False, path_type=Path), help="Private opt-in HA feed config; otherwise use an existing default feed config.")
+def sync(client_id: str, client_secret: str, interval: int, once: bool, data_types: tuple[str, ...], verbose: bool, ha_config: Path | None) -> None:
     """Run the importer. Default mode is a continuous 15-minute loop."""
     configure_logging(verbose)
-    loop = SyncLoop(client_id, client_secret, interval=interval, data_types=data_types or None)
-    loop.run(once=once)
+    try:
+        publisher = optional_publisher(ha_config)
+    except PublisherBusy:
+        raise click.ClickException("ha_feed=publisher_busy") from None
+    try:
+        loop = SyncLoop(
+            client_id, client_secret, interval=interval, data_types=data_types or None,
+            ha_publisher=publisher,
+        )
+        loop.run(once=once)
+    finally:
+        if publisher is not None:
+            publisher.close()
 
 
 @main.command()

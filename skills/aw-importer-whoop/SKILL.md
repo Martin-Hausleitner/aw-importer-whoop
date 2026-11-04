@@ -78,6 +78,36 @@ WHOOP_CLIENT_ID="..." WHOOP_CLIENT_SECRET="..." \
 
 For long-running services, use a private env file or keychain wrapper; do not put secrets in service `ExecStart` lines, shell history, or shared logs.
 
+### Optional official Home Assistant feed
+
+Use the existing sole sync owner and its interval. The opt-in publisher consumes
+official records during the normal full four-type tick, including unchanged AW
+records; it never reads mixed ActivityWatch/CSV buckets. Enable only through the
+private reference-only config documented in README, using the existing HA
+credential store. Never copy WHOOP tokens into Home Assistant or add another
+OAuth client, refresh process, importer or timer.
+
+The feed requires owned `0600` regular files with one hardlink, no symlinks and
+owned `0700` direct parents. An exclusive private publisher lock protects the
+owner. All pages and importer state must complete before its fetched time
+advances; selective `--type` imports do not advance it. The first complete tick
+can use an extra bounded two-day lookback without resetting cursors. Thereafter
+the original cursor/overlap remains in effect.
+
+Keep the minimal cache private and out of Git. It includes only allowlisted
+metrics, original measurement/ordering timestamps and a hashed account binding.
+Pending/unscorable measurements do not become zeros. Naps, mixed accounts,
+future timestamps, invalid durations and non-finite/out-of-contract values must
+not become current measurements. Preserve the latest period when an old record
+is amended.
+
+HA HTTP failure or a missing valid `accepted: true` acknowledgement leaves a
+private pending frame and constant log code, with no provider retry or cadence
+change. Wait for the next regular complete tick. Do not print cache contents,
+health values, request/response bodies, credential values or exception strings.
+Tests establish the software contract; live data arrival and visible HA entities
+need separate verification.
+
 Common OAuth failures:
 
 - Redirect mismatch: confirm the dashboard redirect URI is exactly `http://127.0.0.1:8765/callback`.

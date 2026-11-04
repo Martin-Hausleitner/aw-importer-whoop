@@ -33,6 +33,8 @@ ActivityWatch is expected at `http://127.0.0.1:5600/api/0`.
 - For API sync, create/use a WHOOP developer app, register `http://127.0.0.1:8765/callback`, request only `offline read:recovery read:cycles read:sleep read:workout`, run `aw-importer-whoop login`, then run `aw-importer-whoop sync --once` first.
 - API sync fetches from the last saved cursor; fresh state starts around the last 30 days. Use export imports for older history.
 - Run only one sync process per user/config directory because refresh tokens rotate and state is file-backed.
+- The optional Home Assistant feed runs only inside that same complete four-type official sync; preserve the existing wrapper/interval and never add a scheduler, OAuth owner or direct HA WHOOP refresh. Read the README's private reference-only configuration before enabling it. Do not use mixed ActivityWatch/CSV records as official-feed provenance.
+- A pending HA delivery is retried only by the next regular complete tick. Do not retick the provider, reset cursors, weaken file custody or print cached health metrics to diagnose it. Selective `--type` imports do not advance the HA feed clock.
 - For export backfills, request the WHOOP data export, keep the archive outside the repo, run `import-export --dry-run`, then import.
 - After imports, verify `aw-importer-whoop-*` buckets, event counts, and journal-note privacy in ActivityWatch.
 
