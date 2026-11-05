@@ -106,6 +106,16 @@ state and logs are operational material and must stay out of Git.
 Synthetic tests verify the software contract. Installation, real official data
 arrival and visible Home Assistant entities remain separate acceptance checks.
 
+The dated [joint integration report](https://github.com/Martin-Hausleitner/home-assistant-device-operations/blob/feat/whoop-official-ha-20261104/reports/2026-11-05-whoop-official-home-assistant.md)
+records those checks for the existing deployment. Its ordinary hourly owner
+delivered the next complete official tick on 2026-11-05 at 00:18:43 UTC:
+four cursors advanced, the private pending cache cleared, and independent HA
+registry/status/store reads confirmed 41 own sensors and a fresh feed. The
+redacted evidence is in
+`evidence/2026-11-05-production-natural-acceptance.public.json`; it contains no
+health measurements or account/entity identifiers. HA's timestamp sensor shows
+whole seconds, while its private store preserves the exact cache microseconds.
+
 ## Commands
 
 ```bash

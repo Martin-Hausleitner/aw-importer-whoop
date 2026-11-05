@@ -14,13 +14,13 @@
 - `ruff check .`: all checks passed.
 - `git diff --check`: passed.
 - `openspec validate add-ha-official-feed --strict`: valid.
-- Tests use synthetic records, private temporary files and a mock HTTP transport. No real WHOOP/HA request, login, refresh, VM, source deployment or runtime change was performed by this implementation lane.
-- Live install, official data arrival, independent HA readback and visible entities remain the parent rollout's separate acceptance gates.
+- Those tests used synthetic records, private temporary files and a mock HTTP transport. They performed no real WHOOP/HA request, login, refresh, VM, source deployment or runtime change.
+- At that initial implementation-only checkpoint, live install, official data arrival, independent HA readback and visible entities remained separate gates; the later actual production acceptance appears below.
 
 ## 3. Joint receiver acceptance
 
 - [x] 3.1 Verify the real publisher and complete importer tick against the real isolated HA receiver with a synthetic WHOOP source and fake AW sink.
-- [ ] 3.2 Independently verify production integration and real official-data arrival through the existing sole Mac owner; this code publication does not complete that gate.
+- [x] 3.2 Independently verify production integration and real official-data arrival through the existing sole Mac owner.
 
 The separate VM lane recorded joint acceptance at 2026-11-04T23:09:46.620217Z
 on HA 2026.10.0: 103 unit tests passed; all 23 projected metric fields and 41
@@ -35,3 +35,29 @@ WHOOP measurements, not proof of a production WHOOP API call or personal data.
 The unchanged public receipt is
 `evidence/2026-11-04-whoop-ha-publisher-vm-joint.public.json`, SHA256
 `d27d1022a4e44bf8ddc815d64ae4db97e087e96da0f0ed8dbb0877dd4d40cf4d`.
+
+## Actual natural production acceptance
+
+The unchanged existing owner completed its next ordinary hourly tick at
+2026-11-05T00:18:43.451743Z. All four official cursors advanced, its private
+cache retained four resources and the HA acknowledgement cleared pending.
+The owner stayed at PID 81596/runs 2 throughout 55 read-only observations.
+Independent HA registry/status reads found 41 own sensors and a fresh feed;
+the separate private HA store readback matched the cache timestamp at full
+microsecond precision, with equal provider/source and mode 0600. A separate
+SSH readback observed exactly one new HA core process after the earlier
+authorized core restart. This monitor issued no restart, retick, POST, provider
+request or credential/code change.
+
+The first verifier compared a full-precision cache time to HA's timestamp sensor
+display and therefore kept waiting. HA 2026.10.0 intentionally serializes that
+sensor in seconds; the displayed second matched and the independent private
+store retained the exact microseconds. This was a verifier precision finding,
+not a delivery or product failure. The receipt preserves that distinction and
+checks both display precision and the exact store separately.
+
+The minimal redacted acceptance receipt is
+`evidence/2026-11-05-production-natural-acceptance.public.json`.
+See the [joint integration report](https://github.com/Martin-Hausleitner/home-assistant-device-operations/blob/feat/whoop-official-ha-20261104/reports/2026-11-05-whoop-official-home-assistant.md).
+This closes the official-feed transport/readback gate; it does not claim a
+complete health history, medical interpretation or apartment-wide acceptance.

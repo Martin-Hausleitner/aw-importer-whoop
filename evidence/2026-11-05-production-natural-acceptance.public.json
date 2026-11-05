@@ -1,0 +1,105 @@
+{
+  "schema": "whoop.publisher.production-natural-acceptance.v1",
+  "recorded_at_utc": "2026-11-05T00:25:04.409270+00:00",
+  "all_pass": true,
+  "software_commit": "ec3629853d69743e0ee061bf15f35bc2eef857c7",
+  "baseline_cursor_utc": "2026-11-04T23:18:42.302260+00:00",
+  "natural_tick_fetched_at": "2026-11-05T00:18:43.451743Z",
+  "all_four_cursor_times": {
+    "cycle": "2026-11-05T00:18:43.451743+00:00",
+    "recovery": "2026-11-05T00:18:43.451743+00:00",
+    "sleep": "2026-11-05T00:18:43.451743+00:00",
+    "workout": "2026-11-05T00:18:43.451743+00:00"
+  },
+  "owner": {
+    "pid": 81596,
+    "runs": 2,
+    "state": "running"
+  },
+  "cache": {
+    "pending": false,
+    "mode": "0600",
+    "resource_count": 4,
+    "fetched_at": "2026-11-05T00:18:43.451743Z"
+  },
+  "home_assistant": {
+    "version": "2026.10.0",
+    "own_registry_sensor_count": 41,
+    "feed_status": "fresh",
+    "sensor_fetched_at_seconds": "2026-11-05T00:18:43+00:00",
+    "private_store_fetched_at_full_precision": "2026-11-05T00:18:43.451743Z",
+    "private_store_mode": "0600",
+    "provider_equal": true,
+    "source_equal": true
+  },
+  "checks": {
+    "all_four_cursors_later": true,
+    "cache_fetched_later": true,
+    "cache_pending_false": true,
+    "cache_private_custody_pass": true,
+    "four_resources": true,
+    "owner_pid_runs_unchanged": true,
+    "ha_own_sensor_count_41": true,
+    "ha_feed_fresh": true,
+    "ha_sensor_seconds_equal": true,
+    "ha_store_full_precision_equal": true,
+    "provider_and_source_equal": true,
+    "ha_private_store_0600": true,
+    "core_restart_independently_observed": true
+  },
+  "precision_verifier_finding": {
+    "sensor_display_precision": "seconds",
+    "sensor_seconds_equal": true,
+    "full_precision_store_equal": true,
+    "independent_store_receipt": "production-natural-store-readback.public.json",
+    "independent_store_observed_at": "2026-11-05T00:21:57.716940+00:00",
+    "upstream_behavior": "SensorEntity.state uses value.isoformat(timespec=\"seconds\")",
+    "upstream_source": "https://github.com/home-assistant/core/blob/2026.10.0/homeassistant/components/sensor/__init__.py#L614",
+    "product_error": false
+  },
+  "core_restart_readback": {
+    "schema": "whoop.production.core-restart-readback.v1",
+    "recorded_at_utc": "2026-11-04T23:31:17.160773+00:00",
+    "observation": "Previously completed read-only SSH result from this monitoring turn; no additional server call",
+    "baseline": {
+      "pid": 109436,
+      "startticks": 43376437
+    },
+    "observed": {
+      "pid": 114406,
+      "startticks": 45064663
+    },
+    "single_core": true,
+    "changed_from_pre_restart": true,
+    "ssh_exit": 0,
+    "existing_alias_used": true,
+    "hostkey_check": "strict",
+    "SSH_readonly": true,
+    "restart_actions_by_this_lane": 0,
+    "additional_server_calls_for_this_receipt": 0
+  },
+  "monitor": {
+    "started_at_utc": "2026-11-04T23:29:42.357747+00:00",
+    "finished_at_utc": "2026-11-05T00:24:00.004269+00:00",
+    "observation_count": 55,
+    "minimum_poll_seconds": 60,
+    "manual_actions": {
+      "restarts": 0,
+      "reticks": 0,
+      "provider_calls": 0,
+      "POSTs": 0,
+      "code_changes": 0,
+      "credential_changes": 0,
+      "health_values_output": 0,
+      "entity_ids_output": 0
+    },
+    "actions_scope": "This monitoring lane only; natural owner provider request counts were not intercepted or inferred"
+  },
+  "source_receipt_sha256": {
+    "production-natural-owner-delivery.public.json": "9f64e4d1088b4892e56f761b67ace143b5512cad907a32fa81606f1ccadec00f",
+    "production-natural-store-readback.public.json": "9e602149d65a192ed4f76cab439f648d4aeb2b4a73656897de9934a70fb9c11c",
+    "production-core-restart-readback.public.json": "adde9b90578cabe6c63f65ea81ee0f4af188de09f9be98a462c0d99fe8f76642"
+  },
+  "report_url": "https://github.com/Martin-Hausleitner/home-assistant-device-operations/blob/feat/whoop-official-ha-20261104/reports/2026-11-05-whoop-official-home-assistant.md",
+  "scope": "Natural existing-owner official sync delivery, private cache acknowledgement and independent HA registry/status/store metadata; no health values or entity/account identifiers exported"
+}
