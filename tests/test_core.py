@@ -209,3 +209,17 @@ def test_import_export_dry_run_reads_zip_without_activitywatch_or_state(monkeypa
     assert stats.updated == 0
     assert stats.skipped == 0
     assert not state_file.exists()
+
+
+def test_inserted_event_id_accepts_all_activitywatch_response_shapes() -> None:
+    from aw_importer_whoop.activitywatch import inserted_event_id
+
+    assert inserted_event_id(42) == 42
+    assert inserted_event_id("42") == 42
+    assert inserted_event_id({"id": 7, "data": {}}) == 7
+    # aw-server since the 2026-11-05 restart answers with a list of inserted events.
+    assert inserted_event_id([{"id": 9, "data": {}}]) == 9
+    assert inserted_event_id([]) is None
+    assert inserted_event_id(None) is None
+    assert inserted_event_id({"data": {}}) is None
+    assert inserted_event_id(True) is None

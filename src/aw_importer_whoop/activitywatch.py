@@ -51,6 +51,22 @@ def stable_hash(record: dict[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def inserted_event_id(payload: Any) -> int | None:
+    """Return the new event id from any ActivityWatch POST /events response shape."""
+    if isinstance(payload, list):
+        ids = [inserted_event_id(item) for item in payload]
+        ids = [i for i in ids if i is not None]
+        return ids[-1] if ids else None
+    if isinstance(payload, dict):
+        payload = payload.get("id")
+    if isinstance(payload, bool) or payload is None:
+        return None
+    try:
+        return int(payload)
+    except (TypeError, ValueError):
+        return None
+
+
 def record_uuid(record: dict[str, Any]) -> str:
     for key in ("id", "sleep_id", "workout_id", "cycle_id", "recovery_id"):
         if record.get(key):
@@ -172,6 +188,9 @@ class ActivityWatchClient:
                 r.raise_for_status()
 
     def replace_record_event(self, data_type: str, record: dict[str, Any], old_event_id: int | None = None) -> int:
+        # ActivityWatch servers differ in the POST /events response: an id, an
+        # event object, a list of inserted events, or null. Normalize it so a
+        # successful insert never aborts the tick before stale copies are deleted.
         bucket_id = f"{BUCKET_PREFIX}-{data_type}"
         self.ensure_bucket(bucket_id, f"whoop.{data_type}")
         rid = record_uuid(record)
@@ -190,7 +209,7 @@ class ActivityWatchClient:
 
             inserted = client.post(f"{self.base_url}/buckets/{bucket_id}/events", json=event)
             inserted.raise_for_status()
-            new_id = inserted.json()
+            new_id = inserted_event_id(inserted.json())
             for event_id in stale_ids:
                 if new_id is not None and int(event_id) == int(new_id):
                     continue
